@@ -5,6 +5,8 @@ import argparse
 from bs4 import BeautifulSoup
 # from google.protobuf.json_format import MessageToJson
 
+tf.get_logger().setLevel('ERROR')
+
 
 def get_real_id(random_id: str) -> str:
     url = 'http://data.yt8m.org/2/j/i/{}/{}.js'.format(random_id[0:2],
@@ -17,7 +19,10 @@ def get_real_id(random_id: str) -> str:
 def extract_video_metadata_from_tf_records(tf_records_directory):
     tf_records_files = os.listdir(tf_records_directory)
     videos = []
+
     print(f"processing tf records from {tf_records_directory}")
+    current_file_idx = 0
+
     for tf_file in tf_records_files:
         path = os.path.join(tf_records_directory, tf_file)
         try:
@@ -27,7 +32,8 @@ def extract_video_metadata_from_tf_records(tf_records_directory):
                 vid = {}
                 vid['video_id'] = get_real_id(example.features.feature['id'].bytes_list.value[0].decode(encoding='UTF-8'))
                 vid['y8_labels'] = example.features.feature['labels']
-
+                print(f'Processed {current_file_idx} videos\r', end="")
+                current_file_idx += 1
                 videos.append(vid)
 
         except Exception as e:
@@ -39,8 +45,15 @@ def extract_video_metadata_from_tf_records(tf_records_directory):
 def scrap_metadata_from_youtube(videos):
     youtube_base_url = "https://youtube.com/watch?v="
     expanded_videos = []
+
     print("expanding data from youtube")
+    total_videos_num = len(videos)
+    current_video_idx = 0
+
     for vid in videos:
+        print(f'Processing videos {current_video_idx}/{total_videos_num} videos processed\r', end="")
+        current_video_idx += 1
+
         url = youtube_base_url + vid['video_id']
         vid['video_url'] = url
 

@@ -4,9 +4,25 @@ import os
 import argparse
 import json
 from bs4 import BeautifulSoup
+from base64 import b64encode, b64decode
+from json import JSONEncoder
+import pickle
 # from google.protobuf.json_format import MessageToJson
 
 tf.get_logger().setLevel('ERROR')
+
+
+class PythonObjectEncoder(JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, (list, dict, str, int, float, bool, type(None))):
+            return super().default(obj)
+        return {'_python_object': b64encode(pickle.dumps(obj)).decode('utf-8')}
+
+
+def as_python_object(dct):
+    if '_python_object' in dct:
+        return pickle.loads(b64decode(dct['_python_object'].encode('utf-8')))
+    return dct
 
 
 def get_real_id(random_id: str) -> str:
@@ -99,30 +115,45 @@ def scrap_video_page_content(soup, vid):
     return vid
 
 
-def scrap_metadata_from_youtube(videos):
+def commit_data_to_disk(json_data):
+    print("commiting data to disk ....")
+    try:
+        with open("./videos.json", "w") as f:
+            json.dump({"data": json_data}, f, cls=PythonObjectEncoder)
+            # loader loads(json_data, object_hook=as_python_object)
+    except Exception as e:
+        print(f"Failed to write update to disk due to {e}")
+
+
+def scrap_metadata_from_youtube(videos, write_cycle_width):
     youtube_base_url = "https://youtube.com/watch?v="
     expanded_videos = []
 
     print("expanding data from youtube")
     current_video_idx = 0
+    parsed_videos_count = 0
     try:
         for vid in videos:
-            print(f'Processing video #{current_video_idx} \r')
-            current_video_idx += 1
-
             url = youtube_base_url + vid['video_id']
             vid['video_url'] = url
             print(f'Processing video #{current_video_idx}  @ {url}\r')
-
-            source = requests.get(url).text
-            soup = BeautifulSoup(source, 'html.parser')
+            current_video_idx += 1
 
             try:
+                response = requests.get(url)
+                response.raise_for_status()
+                source = response.text
+                soup = BeautifulSoup(source, 'html.parser')
                 vid = scrap_video_page_content(soup, vid)
+                expanded_videos.append(vid)
+                print(f'Parsed video {vid}')
+                parsed_videos_count += 1
             except Exception as e:
                 print(f"cannot parse video from url {url} due to: {e}")
 
-            expanded_videos.append(vid)
+            if(parsed_videos_count % write_cycle_width == 0):
+                commit_data_to_disk(expanded_videos)
+
     except Exception as e:
         print(f"processing all videos failed due to: {e}")
 
@@ -131,11 +162,10 @@ def scrap_metadata_from_youtube(videos):
 
 parser = argparse.ArgumentParser()
 parser.add_argument("y8m_data", help="Directory path of your tf-records from Youtube-8M")
+parser.add_argument("write_cycle_width", help="After how many successfull parsed videos should we commit and save")
+
 args = parser.parse_args()
 
 videos = extract_video_metadata_from_tf_records(args.y8m_data)
 
-expanded_videos = scrap_metadata_from_youtube(videos)
-
-with open("videos.json", "w") as f:
-    json.dump(expanded_videos, f)
+expanded_videos = scrap_metadata_from_youtube(videos, int(args.write_cycle_width))

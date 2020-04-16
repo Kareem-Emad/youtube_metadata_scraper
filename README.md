@@ -24,5 +24,11 @@ flake8
 ## How to Run
 
 ```shell
-python main.py y8m_tf_records_data_directory
+python main.py y8m_tf_records_data_directory commit_every_x_videos
+```
+
+Example
+
+```shell
+python main.py ./data 20
 ```

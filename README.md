@@ -1,5 +1,8 @@
 # Youtube Metadata Scraper
 
+[![Python 3.6](https://img.shields.io/badge/python-3.6-blue.svg)](https://www.python.org/downloads/release/python-360/)         [![PyPI license](https://img.shields.io/pypi/l/ansicolortags.svg)](https://pypi.python.org/pypi/ansicolortags/)
+
+
 This repo serves as an expansion over youtube-8m dataset in terms of metadata, the project aims to
 scrap more metadata about the videos itself rather than data, such as views count, comments, etc.
 
